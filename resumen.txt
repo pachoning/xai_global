@@ -1,0 +1,11 @@
+Caso base:
+- Notebook: create_features
+- Problemas:
+    - Al automatizar el número de clusters, las métricas de optimización apuntan a que el mínimo está en 2-3 clústers.
+    - Extractor de features pobres. Las features las calculo yo a mano: media, desviaciones standards, etc.
+--------------------------------------------------------------------------------------------------------------------------
+Usando una red pre-entrenada como extractor de features:
+- Notebook: create_features_CNN
+- Problemas:
+    - Muchas features son 0.
+    
