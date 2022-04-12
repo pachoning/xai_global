@@ -3,6 +3,7 @@ from skimage import io
 from skimage.measure import EllipseModel
 import numpy as np
 import pandas as pd
+from functools import partial
 
 class FeaturesManager:
     
@@ -18,17 +19,51 @@ class FeaturesManager:
             {'name': 'std_channel', 'multiple_values': True, 'is_index': False, 'fun': self.get_std},
             {'name': 'channels_correlation', 'multiple_values': True, 'is_index': False, 'fun': self.get_channels_correlation},
             {'name': 'mass_center', 'multiple_values': True, 'is_index': False, 'fun': self.get_mass_center},
-            {'name': 'ellipse_ratio', 'multiple_values': False, 'is_index': False, 'fun': self.get_ellipse_features}
+            {'name': 'ellipse_ratio', 'multiple_values': False, 'is_index': False, 'fun': self.get_ellipse_features},
+            
+            #{'name': 'q_5_channel', 'multiple_values': True, 'is_index': False, 'fun': partial(self.get_quant, q=.05, per_axis=True)},
+            #{'name': 'q_10_channel', 'multiple_values': True, 'is_index': False, 'fun': partial(self.get_quant, q=.1, per_axis=True)},
+            #{'name': 'q_25_channel', 'multiple_values': True, 'is_index': False, 'fun': partial(self.get_quant, q=.25, per_axis=True)},
+            #{'name': 'q_50_channel', 'multiple_values': True, 'is_index': False, 'fun': partial(self.get_quant, q=.5, per_axis=True)},
+            #{'name': 'q_75_channel', 'multiple_values': True, 'is_index': False, 'fun': partial(self.get_quant, q=.75, per_axis=True)},
+            #{'name': 'q_90_channel', 'multiple_values': True, 'is_index': False, 'fun': partial(self.get_quant, q=.9, per_axis=True)},
+            #{'name': 'q_95_channel', 'multiple_values': True, 'is_index': False, 'fun': partial(self.get_quant, q=.95, per_axis=True)},
+            
+            {'name': 'q_5', 'multiple_values': False, 'is_index': False, 'fun': partial(self.get_quant, q=.05, per_axis=False)},
+            {'name': 'q_10', 'multiple_values': False, 'is_index': False, 'fun': partial(self.get_quant, q=.1, per_axis=False)},
+            {'name': 'q_25', 'multiple_values': False, 'is_index': False, 'fun': partial(self.get_quant, q=.25, per_axis=False)},
+            {'name': 'q_50', 'multiple_values': False, 'is_index': False, 'fun': partial(self.get_quant, q=.5, per_axis=False)},
+            {'name': 'q_75', 'multiple_values': False, 'is_index': False, 'fun': partial(self.get_quant, q=.75, per_axis=False)},
+            {'name': 'q_90', 'multiple_values': False, 'is_index': False, 'fun': partial(self.get_quant, q=.9, per_axis=False)},
+            {'name': 'q_95', 'multiple_values': False, 'is_index': False, 'fun': partial(self.get_quant, q=.95, per_axis=False)},
         ]
         self.normalise_features = normalise_features
         self.num_channels = num_channels
         self.mask_shape = mask.shape
         
-    def get_num_superpixel(self, num_superpixel, *arg, **kwargs):
+        
+    def get_quant(self, q, superpixel, per_axis, *args, **kwargs):
+        if self.normalise_features:
+            if per_axis:
+                return np.quantile(a=superpixel/255, q=q, axis=0)
+            else:
+                return np.quantile(a=superpixel/255, q=q)
+        else:
+            if per_axis:
+                return np.quantile(a=superpixel, q=q, axis=0)
+            else:
+                return np.quantile(a=superpixel, q=q)
+                
+        
+    def get_num_superpixel(self, num_superpixel, *args, **kwargs):
         return num_superpixel
     
     def get_total_pixels(self, superpixel, *args, **kwargs):
-        return superpixel.shape[0]
+        total_pixels = self.mask_shape[0] * self.mask_shape[1]
+        if self.normalise_features:
+            return superpixel.shape[0]/total_pixels
+        else:
+            return superpixel.shape[0]
     
     def get_image_name(self, *args, **kwargs):
         return self.image_name
@@ -54,7 +89,7 @@ class FeaturesManager:
         if self.normalise_features:
             superpixel_norm = superpixel/255
         
-        if superpixel_shape[0] > 1 and superpixel_shape[1]:
+        if superpixel_shape[0]>1 and superpixel_shape[1]>1:
             corr_matrix = np.corrcoef(superpixel_norm, rowvar=False)
             idx = np.triu_indices(n=self.num_channels, m=self.num_channels, k=1)
             corr_vector = corr_matrix[idx]
@@ -76,7 +111,7 @@ class FeaturesManager:
         
     def get_ellipse_features(self, coordinates, *args, **kwargs):
         
-        if(len(coordinates[0]) > 1 and len(coordinates[1]) > 1):
+        if len(coordinates[0]) > 1 and len(coordinates[1]) > 1:
             coordinates_stack = np.column_stack(coordinates)
             ellipse = EllipseModel()
             ellipse.estimate(coordinates_stack)
@@ -88,8 +123,7 @@ class FeaturesManager:
             ratio = None
         
         return ratio
-           
-    
+
     def create_data_frame(self, dict_features):
         
         df = pd.DataFrame(dict_features)
@@ -112,6 +146,17 @@ class FeaturesManager:
 
         return df
     
+    def clean_data(self, df):
+
+        columns = df.columns
+        for column in columns:
+            values = df[column]
+            mean_column = np.mean(values)
+            idx_missing = np.isnan(values)
+
+            if len(idx_missing)>0:
+                df.loc[idx_missing, column] = mean_column        
+    
     def get_features(self):
         
         full_path = os.path.join(self.location, self.image_name)
@@ -127,21 +172,23 @@ class FeaturesManager:
         for index in unique_superpixels:
             coordinates = np.where(mask == index)
             superpixel = img[coordinates]
-            num_pixels = total_pixels = self.get_total_pixels(superpixel=superpixel)
+            num_pixels = self.get_total_pixels(superpixel=superpixel)
             
             if num_pixels<=1:
                 deleted_superpixels.append(index)
-            else:
-                for feature in self.features_properties:
-                    feature_name = feature['name']
-                    feature_values = feature['fun'](superpixel=superpixel, num_superpixel=index, 
-                                                    img=img, mask=mask, coordinates=coordinates)
+            
+            for feature in self.features_properties:
+                feature_name = feature['name']
+                feature_values = feature['fun'](superpixel=superpixel, num_superpixel=index,
+                                                img=img, mask=mask, coordinates=coordinates)
 
-                    if feature_name in dict_features.keys():
-                        dict_features[feature_name].append(feature_values)
-                    else:
-                        dict_features[feature_name] = [feature_values]
+                if feature_name in dict_features.keys():
+                    dict_features[feature_name].append(feature_values)
+                else:
+                    dict_features[feature_name] = [feature_values]
         
-        pd_features = self.create_data_frame(dict_features)
+        df_features = self.create_data_frame(dict_features)
         
-        return pd_features, deleted_superpixels
+        self.clean_data(df_features)
+        
+        return df_features, deleted_superpixels
