@@ -8,4 +8,4 @@ Usando una red pre-entrenada como extractor de features:
 - Notebook: create_features_CNN
 - Problemas:
     - Muchas features son 0.
-    
+--------------------------------------------------------------------------------------------------------------------------
