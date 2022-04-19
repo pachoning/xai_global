@@ -7,8 +7,8 @@ from functools import partial
 
 class FeaturesManager:
     
-    def __init__(self, location, image_name, mask, normalise_features, num_channels):
-        self.location = location
+    def __init__(self, img, image_name, mask, normalise_features, num_channels):
+        self.img = img
         self.image_name = image_name
         self.mask = mask
         self.features_properties = [
@@ -56,7 +56,7 @@ class FeaturesManager:
                 
         
     def get_num_superpixel(self, num_superpixel, *args, **kwargs):
-        return num_superpixel
+        return int(num_superpixel)
     
     def get_total_pixels(self, superpixel, *args, **kwargs):
         total_pixels = self.mask_shape[0] * self.mask_shape[1]
@@ -158,9 +158,8 @@ class FeaturesManager:
                 df.loc[idx_missing, column] = mean_column        
     
     def get_features(self):
-        
-        full_path = os.path.join(self.location, self.image_name)
-        img = io.imread(full_path)
+
+        img = self.img
         mask = self.mask
         
         deleted_superpixels = []
